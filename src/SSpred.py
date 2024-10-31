@@ -113,25 +113,22 @@ def predict(sequence, probabilities, window_size=2):
     prediction = []
     
     for i in range(len(sequence)):
-        counts = [0, 0]  # [non-helix-preferring, helix-preferring]
+        aa = sequence[i]
+        
+        prob_not_helix, prob_helix = probabilities.get(aa, [0.5, 0.5])
 
-        # Calculate counts in the window
         for j in range(-window_size, window_size + 1):
             if i + j < 0 or i + j >= len(sequence) or j == 0:
                 continue
             neighbor = sequence[i + j]
-            if neighbor in helix_preferring:
-                counts[1] += 1
-            else:
-                counts[0] += 1
+            if neighbor in probabilities:
+                prob_not_helix *= probabilities[neighbor][0]
+                prob_helix *= probabilities[neighbor][1]
 
-        # Calculate probability of H vs. non-H using Bayesian decision rule
-        prob_helix = (probabilities['non_helix_preferring'][1] ** counts[0]) * \
-                     (probabilities['helix_preferring'][1] ** counts[1])
-        prob_not_helix = (probabilities['non_helix_preferring'][0] ** counts[0]) * \
-                         (probabilities['helix_preferring'][0] ** counts[1])
-
-        # Apply decision rule
+        total_prob = prob_not_helix + prob_helix
+        prob_not_helix /= total_prob
+        prob_helix /= total_prob
+        
         if prob_helix > prob_not_helix:
             prediction.append('H')
         else:
@@ -154,4 +151,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
