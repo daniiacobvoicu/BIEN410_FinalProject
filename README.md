@@ -5,4 +5,4 @@ This is with learning_rate=0.01
 
 Adjusting learning_rate to 0.02 and epoch to 10 000; loss function gives 0.62874 for epoch 9900. And it achieves 65.382308 % so roughly the exact same thing. Seems we have hit the max with this method. 
 
-
+Could add a function that does regularization as well to prevent overfitting, but probably not all that worth it for the case of LR. 
