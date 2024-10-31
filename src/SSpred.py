@@ -14,139 +14,59 @@ This script contains 3 functions:
 	SS_random_prediction(): A function that makes a random prediction weighted by the fraction of alpha helices in the training data
 	writeOutput(): A function that write a prediction to an output file 
 '''
-#need to maintain the writeOutput part of the function, and the readInput part of the function. Then I just need to modify SS_random_prediction.
-#Perhaps I can avoid having a training file, but for more complex models/weights, maybe I need a more complex model to actually get weights. 
 
-# import random
-# import numpy as np
-
-# inputFile 		= "../input_file/infile.txt"
-# parameters 		= "parameters.txt"
-# predictionFile	= "../output_file/outfile.txt"
-# labelsFile = "../training_data/labels.txt"
-
-# def readInput(inputFile):
-# 	'''
-# 		Read the data in a FASTA format file, parse it into into a python dictionnary 
-# 		Args: 
-# 			inputFile (str): path to the input file
-# 		Returns:
-# 			training_data (dict): dictionary with format {name (str):sequence (str)} 
-# 	'''
-# 	inputData = {}
-# 	with open(inputFile, 'r') as f:
-# 		while True:
-# 			name = f.readline()
-# 			seq = f.readline()
-# 			if not seq: break
-# 			inputData.update({name.rstrip():seq.rstrip()})
-	
-# 	return inputData
-
-# def training_data(labelsFile):
-# 	'''
-# 	Reads the labelled data in FASTA format file, 
-	
-# 	'''
-
-# # def SS_random_prediction(inputData,parameters):
-# # 	'''
-# # 		Predict between alpha-helix (symbol: H) and non-alpha helix (symbol: -) for each amino acid in the input sequences
-# # 		The prediction is random but weighted by the overall fraction of alpha helices in the training data (stored in parameters)
-# # 		Args: 
-# # 			inputData (dict): dictionary with format {name (str):sequence (str)} 
-# # 			parameters (str): path to the file with with parameters obtained from training
-# # 		Returns:
-# # 			randomPredictions (dict): dictionary with format {name (str):ss_prediction (str)} 
-# # 	'''
-
-# # 	with open(parameters, 'r') as f:
-# # 		fraction = float(next(f))
-	
-# # 	randomPredictions = {}
-# # 	for name in inputData:
-# # 		seq = inputData[name]
-# # 		preds=""
-	
-# # 		for aa in seq:
-# # 			preds=preds+random.choices(["H","-"], weights = [fraction,1-fraction])[0]
-		
-# # 		randomPredictions.update({name:preds})
-	
-# # 	return randomPredictions
-
-# def writeOutput(inputData,predictions,outputFile):
-# 	'''
-# 		Writes output file with the predictions in the correct format
-# 		Args: 
-# 			inputData (dict): dictionary with format {name (str):sequence (str)} 
-# 			predictions (dict): dictionary with format {name (str):ss_prediction (str)} 
-# 			outputFile (str): path to the output file
-# 	'''
-# 	with open(outputFile, 'w') as f:
-# 		for name in inputData:
-# 			f.write(name+"\n")
-# 			f.write(inputData[name]+"\n")
-# 			f.write(predictions[name]+"\n")
-
-# 	return
-
-
-# def main():
-
-# 	inputData = readInput(inputFile)
-# 	predictions = SS_random_prediction(inputData,parameters)
-# 	writeOutput(inputData,predictions,predictionFile)
-
-# if __name__ == '__main__':
-# 	main()
-
+import numpy as np
 import json
+
+def sigmoid(z):
+    return 1 / (1 + np.exp(-z))
 
 def load_parameters(filepath="parameters.txt"):
     with open(filepath, 'r') as f:
         parameters = json.load(f)
-    return parameters
+    weights = np.array(parameters['weights'])
+    bias = parameters['bias']
+    return weights, bias
 
-def predict(sequence, probabilities, window_size=2):
-    helix_preferring = {'M', 'A', 'L', 'E', 'K'}
-    prediction = []
-    
+def extract_features(sequence, helix_preferring, window_size=2):
+    features = []
     for i in range(len(sequence)):
-        aa = sequence[i]
-        
-        prob_not_helix, prob_helix = probabilities.get(aa, [0.5, 0.5])
-
+        feature = []
         for j in range(-window_size, window_size + 1):
-            if i + j < 0 or i + j >= len(sequence) or j == 0:
-                continue
-            neighbor = sequence[i + j]
-            if neighbor in probabilities:
-                prob_not_helix *= probabilities[neighbor][0]
-                prob_helix *= probabilities[neighbor][1]
+            if i + j < 0 or i + j >= len(sequence):
+                feature.append(0)
+            else:
+                feature.append(1 if sequence[i + j] in helix_preferring else 0)
+        features.append(feature)
+    return np.array(features)
 
-        total_prob = prob_not_helix + prob_helix
-        prob_not_helix /= total_prob
-        prob_helix /= total_prob
-        
-        if prob_helix > prob_not_helix:
-            prediction.append('H')
-        else:
-            prediction.append('-')
+def predict(sequence, weights, bias, helix_preferring, window_size=2):
+    # Extract features from the sequence
+    X = extract_features(sequence, helix_preferring, window_size)
+    linear_model = np.dot(X, weights) + bias
+    y_pred = sigmoid(linear_model)
     
-    return "".join(prediction)
+    # Predict helix or non-helix based on probability threshold of 0.5
+    predictions = ['H' if p >= 0.5 else '-' for p in y_pred]
+    return ''.join(predictions)
 
 def main():
-    probabilities = load_parameters("parameters.txt")
-    
+    helix_preferring = {'M', 'A', 'L', 'E', 'K'}
+    window_size = 2
+
+    # Load the trained parameters
+    weights, bias = load_parameters("parameters.txt")
+
+    # Open input file and make predictions
     with open("../input_file/infile.txt", 'r') as infile, open("../output_file/outfile.txt", 'w') as outfile:
         lines = infile.readlines()
         
         for i in range(0, len(lines), 2):
             description = lines[i].strip()
             sequence = lines[i+1].strip()
-            prediction = predict(sequence, probabilities)
+            prediction = predict(sequence, weights, bias, helix_preferring, window_size)
             
+            # Write predictions to the output file
             outfile.write(f"{description}\n{sequence}\n{prediction}\n")
 
 if __name__ == "__main__":
