@@ -14,16 +14,63 @@ This script contains 2 functions:
 import numpy as np
 import json
 
-#definining initial logistic regression functions
-#sigmoid function to convert to a probability between 0 and 1
-def sigmoid(z):
-    return 1 / (1 + np.exp(-z))
+def gini_impurity(y):
+    proportions = np.bincount(y) / len(y)
+    return 1 - np.sum(proportions ** 2)
 
-#Cross-entropy loss to figure out the difference between predicted and actual labels
-def cross_entropy_loss(y_true, y_pred):
-    return -np.mean(y_true * np.log(y_pred) + (1 - y_true) * np.log(1 - y_pred))
+def split_dataset(X, y, feature_index, threshold):
+    left_mask = X[:, feature_index] <= threshold
+    right_mask = X[:, feature_index] > threshold
+    return X[left_mask], y[left_mask], X[right_mask], y[right_mask]
 
-#load up input data
+def best_split(X, y):
+    best_gini = float("inf")
+    best_index, best_threshold = None, None
+    for feature_index in range(X.shape[1]):
+        thresholds = np.unique(X[:, feature_index])
+        for threshold in thresholds:
+            _, y_left, _, y_right = split_dataset(X, y, feature_index, threshold)
+            if len(y_left) == 0 or len(y_right) == 0:
+                continue
+            
+            gini = (len(y_left) * gini_impurity(y_left) + len(y_right) * gini_impurity(y_right)) / len(y)
+            if gini < best_gini:
+                best_gini = gini
+                best_index, best_threshold = feature_index, threshold
+    
+    return best_index, best_threshold
+
+def build_tree(X, y, depth=0, max_depth=5, min_samples_split=2):
+    num_samples, num_features = X.shape
+    if depth >= max_depth or num_samples < min_samples_split or np.all(y == y[0]):
+        return int(np.bincount(y).argmax())  # Convert to Python int for JSON compatibility
+
+    feature_index, threshold = best_split(X, y)
+    if feature_index is None:
+        return int(np.bincount(y).argmax())  # Convert to Python int for JSON compatibility
+
+    left_X, left_y, right_X, right_y = split_dataset(X, y, feature_index, threshold)
+    left_subtree = build_tree(left_X, left_y, depth + 1, max_depth, min_samples_split)
+    right_subtree = build_tree(right_X, right_y, depth + 1, max_depth, min_samples_split)
+    return {"feature_index": int(feature_index), "threshold": float(threshold), "left": left_subtree, "right": right_subtree}
+
+def convert_to_serializable(obj):
+    if isinstance(obj, dict):
+        return {k: convert_to_serializable(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_to_serializable(i) for i in obj]
+    elif isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return float(obj)
+    else:
+        return obj
+
+def save_tree(tree, filepath="parameters.txt"):
+    tree = convert_to_serializable(tree)  # Convert tree to JSON-serializable format
+    with open(filepath, 'w') as f:
+        json.dump(tree, f)
+
 def load_training_data(labels_file):
     sequences = []
     structures = []
@@ -39,62 +86,27 @@ def load_training_data(labels_file):
     return sequences, structures
 
 def extract_features(sequence, helix_preferring, window_size=2):
-    # Initialize feature array
     features = []
-    
     for i in range(len(sequence)):
         feature = []
         for j in range(-window_size, window_size + 1):
             if i + j < 0 or i + j >= len(sequence):
-                feature.append(0)  # Padding for out-of-bounds
+                feature.append(0)
             else:
                 feature.append(1 if sequence[i + j] in helix_preferring else 0)
-        
         features.append(feature)
-    
     return np.array(features)
-
-def train_logistic_regression(X, y, learning_rate=0.01, epochs=1000):
-    # Initialize weights
-    weights = np.zeros(X.shape[1])
-    bias = 0
-
-    for epoch in range(epochs):
-        # Linear model
-        linear_model = np.dot(X, weights) + bias
-        y_pred = sigmoid(linear_model)
-
-        # Calculate gradients
-        dw = np.dot(X.T, (y_pred - y)) / y.size
-        db = np.sum(y_pred - y) / y.size
-
-        # Update weights and bias
-        weights -= learning_rate * dw
-        bias -= learning_rate * db
-
-        # Optional: Print loss for monitoring training
-        if epoch % 100 == 0:
-            loss = cross_entropy_loss(y, y_pred)
-            print(f"Epoch {epoch}, Loss: {loss}")
-
-    return weights, bias
-
-def save_parameters(weights, bias, filepath="parameters.txt"):
-    parameters = {
-        'weights': weights.tolist(),
-        'bias': bias
-    }
-    with open(filepath, 'w') as f:
-        json.dump(parameters, f)
 
 def main():
     helix_preferring = {'M', 'A', 'L', 'E', 'K'}
-    window_size = 2
+    window_size = 5
+    max_depth = 15
+    min_samples_split = 10
     
-    # Load data
+    # Load training data
     sequences, structures = load_training_data("../training_data/labels.txt")
-
-    # Extract features and labels
+    
+    # Prepare features and labels
     X = []
     y = []
     for sequence, structure in zip(sequences, structures):
@@ -104,16 +116,12 @@ def main():
         X.append(features)
         y.append(labels)
     
-    X = np.vstack(X)  # Combine all features into one array
-    y = np.concatenate(y)  # Combine all labels into one array
+    X = np.vstack(X)
+    y = np.concatenate(y)
 
-    # Train logistic regression model
-    weights, bias = train_logistic_regression(X, y)
-
-    # Save parameters
-    save_parameters(weights, bias)
+    # Build and save the tree
+    tree = build_tree(X, y, max_depth=max_depth, min_samples_split=min_samples_split)
+    save_tree(tree)
 
 if __name__ == "__main__":
     main()
-
-
