@@ -15,15 +15,20 @@ This script contains 3 functions:
 	writeOutput(): A function that write a prediction to an output file 
 '''
 
-import json
 import numpy as np
+import json
 
-def load_tree(filepath="parameters.txt"):
+def sigmoid(z):
+    return 1 / (1 + np.exp(-z))
+
+def load_parameters(filepath="parameters.txt"):
     with open(filepath, 'r') as f:
-        tree = json.load(f)
-    return tree
+        parameters = json.load(f)
+    weights = np.array(parameters['weights'])
+    bias = parameters['bias']
+    return weights, bias
 
-def extract_features(sequence, helix_preferring, window_size=5):
+def extract_features(sequence, helix_preferring, window_size=2):
     features = []
     for i in range(len(sequence)):
         feature = []
@@ -35,28 +40,21 @@ def extract_features(sequence, helix_preferring, window_size=5):
         features.append(feature)
     return np.array(features)
 
-def classify_sample(tree, sample):
-    if isinstance(tree, dict):
-        feature_index = tree["feature_index"]
-        threshold = tree["threshold"]
-        if sample[feature_index] <= threshold:
-            return classify_sample(tree["left"], sample)
-        else:
-            return classify_sample(tree["right"], sample)
-    else:
-        return tree
-
-def predict(sequence, tree, helix_preferring, window_size=2):
+def predict(sequence, weights, bias, helix_preferring, window_size=2):
     X = extract_features(sequence, helix_preferring, window_size)
-    predictions = [classify_sample(tree, sample) for sample in X]
-    return ''.join(['H' if p == 1 else '-' for p in predictions])
+    linear_output = np.dot(X, weights) + bias
+    y_pred = sigmoid(linear_output)
+    
+    # Predict helix or non-helix based on probability threshold of 0.5
+    predictions = ['H' if p >= 0.5 else '-' for p in y_pred]
+    return ''.join(predictions)
 
 def main():
     helix_preferring = {'M', 'A', 'L', 'E', 'K'}
     window_size = 5
     
-    # Load tree
-    tree = load_tree("parameters.txt")
+    # Load the trained parameters
+    weights, bias = load_parameters("parameters.txt")
 
     # Open input file and make predictions
     with open("../input_file/infile.txt", 'r') as infile, open("../output_file/outfile.txt", 'w') as outfile:
@@ -65,9 +63,9 @@ def main():
         for i in range(0, len(lines), 2):
             description = lines[i].strip()
             sequence = lines[i+1].strip()
-            prediction = predict(sequence, tree, helix_preferring, window_size)
+            prediction = predict(sequence, weights, bias, helix_preferring, window_size)
             
-            # Write predictions to output file
+            # Write predictions to the output file
             outfile.write(f"{description}\n{sequence}\n{prediction}\n")
 
 if __name__ == "__main__":
