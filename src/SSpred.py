@@ -30,7 +30,7 @@ def load_parameters(filepath="parameters.txt"):
     # Convert lists back to numpy arrays
     return {key: np.array(val) for key, val in parameters.items()}
 
-def extract_features(sequence, helix_preferring, window_size=2):
+def extract_features(sequence, helix_preferring, window_size):
     features = []
     for i in range(len(sequence)):
         feature = []
@@ -42,28 +42,32 @@ def extract_features(sequence, helix_preferring, window_size=2):
         features.append(feature)
     return np.array(features)
 
-def predict(sequence, parameters, helix_preferring, window_size=2):
+def predict(sequence, parameters, helix_preferring, window_size):
     # Extract features for the sequence
     X = extract_features(sequence, helix_preferring, window_size)
     
     # Forward pass
-    W1, b1, W2, b2 = parameters["W1"], parameters["b1"], parameters["W2"], parameters["b2"]
+    W1, b1, W2, b2, W3, b3 = parameters["W1"], parameters["b1"], parameters["W2"], parameters["b2"], parameters["W3"], parameters["b3"]
 
-    # Input to hidden layer
+    # Input to first hidden layer
     Z1 = np.dot(X, W1) + b1
     A1 = relu(Z1)
 
-    # Hidden layer to output layer
+    # First hidden layer to second hidden layer
     Z2 = np.dot(A1, W2) + b2
-    A2 = sigmoid(Z2)
+    A2 = relu(Z2)
+
+    # Second hidden layer to output layer
+    Z3 = np.dot(A2, W3) + b3
+    A3 = sigmoid(Z3)
 
     # Predict helix or non-helix based on threshold
-    predictions = ['H' if p >= 0.5 else '-' for p in A2.flatten()]
+    predictions = ['H' if p >= 0.5 else '-' for p in A3.flatten()]
     return ''.join(predictions)
 
 def main():
     helix_preferring = {'M', 'A', 'L', 'E', 'K'}
-    window_size = 5
+    window_size = 8
 
     # Load the trained parameters
     parameters = load_parameters("parameters.txt")
