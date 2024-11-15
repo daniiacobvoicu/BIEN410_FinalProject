@@ -1,3 +1,2 @@
-So: 
-With SLP and 5000 epochs at 0.02 learning rate we got 66.82479% accuracy which is initially higher than logistic regression. 
-With 10 000 epochs and 0.02 learning rate we get 66.81720% accuracy. 
+66.7161589565642 % for 10k epochs, window adjusted to 5, 32 neurons and 0.01 learning rate. 
+Loss function reached 0.6138443870554746 at 9900 epochs. 
