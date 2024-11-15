@@ -1,2 +1,2 @@
-66.7161589565642 % for 10k epochs, window adjusted to 5, 32 neurons and 0.01 learning rate. 
-Loss function reached 0.6138443870554746 at 9900 epochs. 
+67.11416066539957 % for 10k epochs, window adjusted to 8, 32 neurons per layer for 2 layers and 0.05 learning rate. 
+Took around 6.5hrs to run the training for this model. Perhaps worth implementing Adam solver rather than stochastic gradient descent....
