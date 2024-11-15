@@ -21,12 +21,14 @@ import json
 def sigmoid(z):
     return 1 / (1 + np.exp(-z))
 
+def relu(z):
+    return np.maximum(0, z)
+
 def load_parameters(filepath="parameters.txt"):
     with open(filepath, 'r') as f:
         parameters = json.load(f)
-    weights = np.array(parameters['weights'])
-    bias = parameters['bias']
-    return weights, bias
+    # Convert lists back to numpy arrays
+    return {key: np.array(val) for key, val in parameters.items()}
 
 def extract_features(sequence, helix_preferring, window_size=2):
     features = []
@@ -40,21 +42,31 @@ def extract_features(sequence, helix_preferring, window_size=2):
         features.append(feature)
     return np.array(features)
 
-def predict(sequence, weights, bias, helix_preferring, window_size=2):
+def predict(sequence, parameters, helix_preferring, window_size=2):
+    # Extract features for the sequence
     X = extract_features(sequence, helix_preferring, window_size)
-    linear_output = np.dot(X, weights) + bias
-    y_pred = sigmoid(linear_output)
     
-    # Predict helix or non-helix based on probability threshold of 0.5
-    predictions = ['H' if p >= 0.5 else '-' for p in y_pred]
+    # Forward pass
+    W1, b1, W2, b2 = parameters["W1"], parameters["b1"], parameters["W2"], parameters["b2"]
+
+    # Input to hidden layer
+    Z1 = np.dot(X, W1) + b1
+    A1 = relu(Z1)
+
+    # Hidden layer to output layer
+    Z2 = np.dot(A1, W2) + b2
+    A2 = sigmoid(Z2)
+
+    # Predict helix or non-helix based on threshold
+    predictions = ['H' if p >= 0.5 else '-' for p in A2.flatten()]
     return ''.join(predictions)
 
 def main():
     helix_preferring = {'M', 'A', 'L', 'E', 'K'}
     window_size = 5
-    
+
     # Load the trained parameters
-    weights, bias = load_parameters("parameters.txt")
+    parameters = load_parameters("parameters.txt")
 
     # Open input file and make predictions
     with open("../input_file/infile.txt", 'r') as infile, open("../output_file/outfile.txt", 'w') as outfile:
@@ -63,10 +75,11 @@ def main():
         for i in range(0, len(lines), 2):
             description = lines[i].strip()
             sequence = lines[i+1].strip()
-            prediction = predict(sequence, weights, bias, helix_preferring, window_size)
+            prediction = predict(sequence, parameters, helix_preferring, window_size)
             
             # Write predictions to the output file
             outfile.write(f"{description}\n{sequence}\n{prediction}\n")
 
 if __name__ == "__main__":
     main()
+
