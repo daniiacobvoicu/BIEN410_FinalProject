@@ -1,22 +1,9 @@
-# Python 3 script to edit for this project. 
-# Note 1: Do not change the name of this file
-# Note 2: Do not change the location of this file within the BIEN410_FinalProject package
-# Note 3: This file can only read in "../input_file/input_file.txt" and "parameters.txt" as input
-# Note 4: This file should write output to "../output_file/outfile.txt"
-# Note 5: See example of a working SSPred.py file in ../src_example folder
-'''
-SSpred.py
-===================================================
-Python script that makes a alpha-helix secondary structure prediction for a sequence file
-===================================================
-This script contains 3 functions:
-	readInput(): A function that reads in input from a sequence file
-	SS_random_prediction(): A function that makes a random prediction weighted by the fraction of alpha helices in the training data
-	writeOutput(): A function that write a prediction to an output file 
-'''
-
 import numpy as np
 import json
+
+# Amino acid mapping for one-hot encoding
+AMINO_ACIDS = "ACDEFGHIKLMNPQRSTVWY"
+AA_TO_INDEX = {aa: i for i, aa in enumerate(AMINO_ACIDS)}
 
 def sigmoid(z):
     return 1 / (1 + np.exp(-z))
@@ -25,26 +12,38 @@ def relu(z):
     return np.maximum(0, z)
 
 def load_parameters(filepath="parameters.txt"):
+    """Load trained parameters from the JSON file."""
     with open(filepath, 'r') as f:
         parameters = json.load(f)
     # Convert lists back to numpy arrays
     return {key: np.array(val) for key, val in parameters.items()}
 
-def extract_features(sequence, helix_preferring, window_size):
+def one_hot_encode_amino_acid(aa):
+    """Convert a single amino acid to a one-hot vector."""
+    vector = np.zeros(len(AMINO_ACIDS))
+    if aa in AA_TO_INDEX:
+        vector[AA_TO_INDEX[aa]] = 1
+    return vector
+
+def extract_features(sequence, window_size=2):
+    """Extract features using one-hot encoding for a sliding window."""
     features = []
+    num_amino_acids = len(AMINO_ACIDS)
     for i in range(len(sequence)):
         feature = []
         for j in range(-window_size, window_size + 1):
             if i + j < 0 or i + j >= len(sequence):
-                feature.append(0)
+                # Padding with zeros for out-of-bound indices
+                feature.extend(np.zeros(num_amino_acids))
             else:
-                feature.append(1 if sequence[i + j] in helix_preferring else 0)
+                feature.extend(one_hot_encode_amino_acid(sequence[i + j]))
         features.append(feature)
     return np.array(features)
 
-def predict(sequence, parameters, helix_preferring, window_size):
+def predict(sequence, parameters, window_size=2):
+    """Predict the secondary structure for a given sequence."""
     # Extract features for the sequence
-    X = extract_features(sequence, helix_preferring, window_size)
+    X = extract_features(sequence, window_size)
     
     # Forward pass
     W1, b1, W2, b2, W3, b3 = parameters["W1"], parameters["b1"], parameters["W2"], parameters["b2"], parameters["W3"], parameters["b3"]
@@ -66,7 +65,6 @@ def predict(sequence, parameters, helix_preferring, window_size):
     return ''.join(predictions)
 
 def main():
-    helix_preferring = {'M', 'A', 'L', 'E', 'K'}
     window_size = 8
 
     # Load the trained parameters
@@ -79,11 +77,10 @@ def main():
         for i in range(0, len(lines), 2):
             description = lines[i].strip()
             sequence = lines[i+1].strip()
-            prediction = predict(sequence, parameters, helix_preferring, window_size)
+            prediction = predict(sequence, parameters, window_size)
             
             # Write predictions to the output file
             outfile.write(f"{description}\n{sequence}\n{prediction}\n")
 
 if __name__ == "__main__":
     main()
-

@@ -1,5 +1,10 @@
 import numpy as np
 import json
+import time
+
+# Amino acid mapping for one-hot encoding
+AMINO_ACIDS = "ACDEFGHIKLMNPQRSTVWY"
+AA_TO_INDEX = {aa: i for i, aa in enumerate(AMINO_ACIDS)}
 
 def sigmoid(z):
     return 1 / (1 + np.exp(-z))
@@ -30,15 +35,25 @@ def load_training_data(labels_file):
     
     return sequences, structures
 
-def extract_features(sequence, helix_preferring, window_size):
+def one_hot_encode_amino_acid(aa):
+    """Convert a single amino acid to a one-hot vector."""
+    vector = np.zeros(len(AMINO_ACIDS))
+    if aa in AA_TO_INDEX:
+        vector[AA_TO_INDEX[aa]] = 1
+    return vector
+
+def extract_features(sequence, window_size=2):
+    """Extract features using one-hot encoding for a sliding window."""
     features = []
+    num_amino_acids = len(AMINO_ACIDS)
     for i in range(len(sequence)):
         feature = []
         for j in range(-window_size, window_size + 1):
             if i + j < 0 or i + j >= len(sequence):
-                feature.append(0)
+                # Padding with zeros for out-of-bound indices
+                feature.extend(np.zeros(num_amino_acids))
             else:
-                feature.append(1 if sequence[i + j] in helix_preferring else 0)
+                feature.extend(one_hot_encode_amino_acid(sequence[i + j]))
         features.append(feature)
     return np.array(features)
 
@@ -103,7 +118,7 @@ def update_parameters(parameters, gradients, learning_rate):
     parameters["b3"] -= learning_rate * gradients["db3"]
     return parameters
 
-def train_mlp(X, y, input_size, hidden1_size, hidden2_size, output_size, learning_rate=0.05, epochs=10000):
+def train_mlp(X, y, input_size, hidden1_size, hidden2_size, output_size, learning_rate=0.05, epochs=1000):
     parameters = initialize_parameters(input_size, hidden1_size, hidden2_size, output_size)
 
     for epoch in range(epochs):
@@ -132,9 +147,10 @@ def save_parameters(parameters, filepath="parameters.txt"):
         json.dump(serializable_parameters, f)
 
 def main():
-    helix_preferring = {'M', 'A', 'L', 'E', 'K'}
+    start_time = time.time() #track the time
+
     window_size = 8
-    hidden1_size = 32
+    hidden1_size = 64
     hidden2_size = 32
     output_size = 1
     
@@ -145,7 +161,7 @@ def main():
     X = []
     y = []
     for sequence, structure in zip(sequences, structures):
-        features = extract_features(sequence, helix_preferring, window_size)
+        features = extract_features(sequence, window_size)
         labels = np.array([1 if s == 'H' else 0 for s in structure])
         
         X.append(features)
@@ -155,10 +171,16 @@ def main():
     y = np.concatenate(y).reshape(-1, 1)  # Reshape y for proper matrix operations
 
     # Train MLP
-    parameters = train_mlp(X, y, input_size=X.shape[1], hidden1_size=hidden1_size, hidden2_size=hidden2_size, output_size=output_size)
+    input_size = len(AMINO_ACIDS) * (2 * window_size + 1)
+    parameters = train_mlp(X, y, input_size, hidden1_size, hidden2_size, output_size)
 
     # Save parameters
     save_parameters(parameters)
+
+    #calculate and print runtime
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    print(f"Training completed in {elapsed_time:.2f} seconds.")
 
 if __name__ == "__main__":
     main()
