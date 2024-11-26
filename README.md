@@ -1,5 +1,3 @@
-67.11416066539957 % for 10k epochs, window adjusted to 8, 32 neurons per layer for 2 layers and 0.05 learning rate. 
-Took around 6.5hrs to run the training for this model. Perhaps worth implementing Adam solver rather than stochastic gradient descent....
+Prediction accuracy:  71.02460374200074 %, Window_size = 8, hidden layer 1 = 64, hidden layer 2 = 32, epochs 1000, learning rate 0.05. Cross entropy loss at epoch 900 was 0.5777237417502312. 
 
-Epoch 1000, Loss: 0.6121805995928592 (in the above set), for Epoch 9900, Loss: 0.608805771446013. 
-python testing.py -p ../output_file/outfile.txt -l ../training_data/labels.txt
+But run time was : Training completed in 57121.29 seconds.
